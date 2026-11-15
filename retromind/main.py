@@ -12,7 +12,11 @@ from .repository import Repository
 
 
 def main():
-    os.environ.setdefault('QT_QUICK_BACKEND', 'software')
+    # Use Direct3D WARP software rendering on Windows: VideoOutput stays available
+    # without relying on AMD GPU decoding. Respect explicit user overrides.
+    os.environ.setdefault('QSG_RHI_PREFER_SOFTWARE_RENDERER', '1')
+    os.environ.setdefault('QT_MEDIA_BACKEND', 'ffmpeg')
+    os.environ.setdefault('QT_FFMPEG_DECODING_HW_DEVICE_TYPES', ',')
     QQuickStyle.setStyle('Basic')
     app = QGuiApplication(sys.argv)
     app.setOrganizationName('RetroMind')

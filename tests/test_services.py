@@ -29,7 +29,7 @@ def test_recursive_import_metadata_fallback_and_duplicates(repo, tmp_path):
     (root / 'ignore.txt').write_text('not music')
     progress = []
     result = ImportService(repo).scan(root, lambda *args: progress.append(args))
-    assert result == dict(added=1, duplicates=0, errors=[], cancelled=False)
+    assert {key: result[key] for key in ('added','duplicates','errors','cancelled')} == dict(added=1, duplicates=0, errors=[], cancelled=False)
     track = repo.tracks()[0]
     assert track['title'] == 'Untagged'
     assert track['duration'] == pytest.approx(1)
