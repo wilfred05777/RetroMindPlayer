@@ -10,7 +10,7 @@ ApplicationWindow {
     visible: true
     width: controller.windowWidth; height: controller.windowHeight
     minimumWidth: 800; minimumHeight: 600
-    title: "RetroMind / Local music & video"; color: "#000000"
+    title: Qt.application.displayName + " / Local music & video"; color: "#000000"
     font.family: "Segoe UI"; font.pixelSize: 14
     palette.window: "#121212"; palette.windowText: "#FFFFFF"
     palette.base: "#181818"; palette.text: "#FFFFFF"

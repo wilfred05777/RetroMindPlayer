@@ -2,6 +2,17 @@
 
 A standalone Windows local music and video player, built with Python, PySide6/QML, Qt Multimedia, SQLite, Mutagen, and PyAV. The dark desktop layout keeps RetroMind branding and uses original colour surfaces and system font symbols; no Spotify integration, account, downloaded brand artwork, recommendations, or advertisements are included.
 
+## Windows installer - 0.1.0 Beta
+
+Local unsigned x64 setup: `release/RetroMindPlayer-0.1.0-Beta-win64-Setup.exe`.
+Run it normally; no Python/developer tools are needed for the installed app.
+It installs per user, creates a Start menu shortcut and offers a desktop shortcut.
+Uninstall/upgrade preserves the separate AppData library and original media.
+The adjacent `.sha256` file provides the setup checksum. No upload/publication
+has been performed. See [packaging/VERIFICATION.md](packaging/VERIFICATION.md)
+for actual tests, known AV1 limits and the pending clean-machine check, and
+[packaging/README.md](packaging/README.md) for build files and licence notices.
+
 ## Launch (PowerShell)
 
 ```powershell

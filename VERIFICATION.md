@@ -135,3 +135,15 @@ Windows display settings were not changed. Live monitor/DPI transitions and
 physical touchscreen interaction were not tested. Audio tests were muted and
 used a temporary database and generated WAV; existing user media/library were
 not altered.
+
+
+# Windows 0.1.0 Beta packaging - 2026-11-15
+
+Built and locally verified an unsigned Windows x64 PyInstaller onedir + Inno Setup
+installer. Source regression results: 31 passed, 1 known AV1 expected failure.
+Copied/installed frozen QML, import, artwork, decoded audio/video, seek, volume,
+fullscreen and persistence checks passed. Per-user install, shortcuts, graceful
+same-version upgrade, relaunch and uninstall passed, retaining library/media.
+No clean-machine verification was performed. Detailed results and limits are in
+[packaging/VERIFICATION.md](packaging/VERIFICATION.md). Owner-confirmed audible
+source playback is distinct from muted packaged automated checks.
