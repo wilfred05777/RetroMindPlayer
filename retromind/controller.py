@@ -1,5 +1,6 @@
 """Presentation controller: commands/properties, lifecycle and application coordination."""
 import logging
+import sqlite3
 from pathlib import Path
 from PySide6.QtCore import QObject, Property, Signal, Slot, QThread, QUrl, QTimer, QStandardPaths
 from PySide6.QtMultimedia import QMediaPlayer, QMediaFormat, QVideoFrame
@@ -44,6 +45,7 @@ class Controller(QObject):
     clearVideo = Signal()
     queueChanged = Signal()
     previewChanged = Signal()
+    confirmationChanged = Signal()
     # Future assistant tools should call application services; no assistant UI or model dependency.
 
     def __init__(self, repository):
@@ -51,6 +53,7 @@ class Controller(QObject):
         self.repo = repository
         self._closing = False
         self._preview_report = {}
+        self._pending_removal = {}
         self._query, self._favourites = '', False
         self._playlist = self._int_setting('playlist', 0)
         if self._playlist not in [p['id'] for p in repository.playlists()]:
@@ -117,6 +120,9 @@ class Controller(QObject):
     canImportPreview = Property(bool, lambda self: bool(self._preview_report.get('paths')) and not self._preview_report.get('cancelled', False), notify=previewChanged)
 
     downloadsFolder = Property(str, lambda self: QUrl.fromLocalFile(QStandardPaths.writableLocation(QStandardPaths.DownloadLocation)).toString(), constant=True)
+
+    pendingRemoval = Property('QVariantMap', lambda self: self._pending_removal, notify=confirmationChanged)
+    userPlaylists = Property('QVariantList', lambda self: [p for p in self._playlists if p['id'] > 0], notify=changed)
 
     tracks = Property('QVariantList', lambda self: self._tracks, notify=changed)
     playlists = Property('QVariantList', lambda self: self._playlists, notify=changed)
@@ -192,6 +198,9 @@ class Controller(QObject):
 
     @Slot(int)
     def selectPlaylist(self, playlist_id):
+        if playlist_id and not self.repo.playlist(playlist_id):
+            self.message('This playlist is no longer available.')
+            return
         self._playlist, self._view = playlist_id, 'playlist' if playlist_id else 'all'
         self._favourites = False
         self.repo.save_setting('playlist', playlist_id)
@@ -204,36 +213,175 @@ class Controller(QObject):
             self._current = self.repo.track(track_id)
         self.refresh()
 
-    @Slot(str)
+    @Slot(int, result='QVariantMap')
+    def playlistInfo(self, playlist_id):
+        return self.repo.playlist(playlist_id) or {}
+
+    @Slot(int, result='QVariantMap')
+    def mediaInfo(self, track_id):
+        track = self.repo.track(track_id)
+        return dict(track, available=Path(track['path']).is_file(), queued=track_id in self.queue.items) if track else {}
+
+    @Slot(str, result=bool)
     def createPlaylist(self, name):
         try:
             self.selectPlaylist(self.repo.create_playlist(name))
-        except ValueError as error:
+            self.message('Playlist created.')
+            return True
+        except (ValueError, OSError, sqlite3.Error) as error:
             self.message(str(error))
+            return False
 
-    @Slot(str)
+    @Slot(str, result=bool)
     def renamePlaylist(self, name):
-        if self._playlist:
-            try:
-                self.repo.rename_playlist(self._playlist, name)
-                self.refresh()
-            except ValueError as error:
-                self.message(str(error))
+        return self.renamePlaylistById(self._playlist, name)
+
+    @Slot(int, str, result=bool)
+    def renamePlaylistById(self, playlist_id, name):
+        try:
+            self.repo.rename_playlist(playlist_id, name)
+            self.refresh()
+            self.message('Playlist renamed.')
+            return True
+        except (ValueError, OSError, sqlite3.Error) as error:
+            self.message(str(error))
+            return False
+
+    @Slot(int)
+    def playPlaylist(self, playlist_id):
+        if not self.repo.playlist(playlist_id):
+            self.message('Choose an existing user playlist.')
+            return
+        tracks = self.repo.tracks(playlist_id=playlist_id)
+        if not tracks:
+            self.message('This playlist is empty. Add media to play it.')
+            return
+        self._automatic_transition = False
+        self._failed.clear()
+        self.queue.start([track['id'] for track in tracks], tracks[0]['id'])
+        self.load_track(tracks[0]['id'])
+
+    @Slot(int)
+    def addToQueue(self, track_id):
+        if not self.repo.track(track_id):
+            self.message('This media item is no longer available.')
+            return
+        added = self.queue.append(track_id)
+        self.refresh_queue()
+        self.message('Added to queue.' if added else 'This item is already queued.')
 
     @Slot(int, int)
     def addToPlaylist(self, track_id, playlist_id):
-        if playlist_id and track_id > 0:
-            self.repo.add_to_playlist(playlist_id, track_id)
-            self.refresh()
-            self.message('Added to playlist.')
+        if self.repo.playlist(playlist_id) and self.repo.track(track_id):
+            try:
+                self.repo.add_to_playlist(playlist_id, track_id)
+                self.refresh()
+                self.message('Added to playlist (existing entries are kept once).')
+            except sqlite3.Error as error:
+                self.message('Could not update playlist: ' + str(error))
         else:
             self.message('Select a media item and a named playlist first.')
 
     @Slot(int)
     def removeFromPlaylist(self, track_id):
-        if self._playlist:
-            self.repo.remove_from_playlist(self._playlist, track_id)
+        self.removeFromPlaylistAt(track_id, self._playlist)
+
+    @Slot(int, int)
+    def removeFromPlaylistAt(self, track_id, playlist_id):
+        if not self.repo.playlist(playlist_id):
+            self.message('Choose an existing user playlist.')
+            return
+        try:
+            self.repo.remove_from_playlist(playlist_id, track_id)
             self.refresh()
+            self.message('Removed from playlist. Library item and file kept.')
+        except sqlite3.Error as error:
+            self.message('Could not update playlist: ' + str(error))
+
+    @Slot(int)
+    def requestDeletePlaylist(self, playlist_id):
+        playlist = self.repo.playlist(playlist_id)
+        if not playlist:
+            self.message('Built-in views cannot be deleted. Choose an existing user playlist.')
+            return
+        self._pending_removal = dict(kind='playlist', id=playlist_id, title=playlist['name'], fingerprint=playlist['name'])
+        self.confirmationChanged.emit()
+
+    @Slot(int)
+    def requestRemoveLibrary(self, track_id):
+        track = self.repo.track(track_id)
+        if not track:
+            self.message('This media item is no longer in the library.')
+            return
+        self._pending_removal = dict(kind='media', id=track_id, title=track['title'], fingerprint=track['path'])
+        self.confirmationChanged.emit()
+
+    @Slot()
+    def cancelRemoval(self):
+        self._pending_removal = {}
+        self.confirmationChanged.emit()
+
+    @Slot(result=bool)
+    def confirmRemoval(self):
+        pending = dict(self._pending_removal)
+        self.cancelRemoval()
+        if not pending:
+            return False
+        try:
+            target = pending['id']
+            if pending['kind'] == 'playlist':
+                playlist = self.repo.playlist(target)
+                if not playlist or playlist['name'] != pending['fingerprint']:
+                    raise ValueError('The playlist changed. Open its menu and confirm again.')
+                self.repo.delete_playlist(target)
+                if self._playlist == target:
+                    self.navigate('all')
+                else:
+                    self.refresh()
+                self.message('Playlist deleted. Library items and original files kept.')
+            else:
+                track = self.repo.track(target)
+                if not track or track['path'] != pending['fingerprint']:
+                    raise ValueError('The media item changed. Open its menu and confirm again.')
+                self.repo.remove_track(target)
+                self.queue.discard(target)
+                self._failed.discard(target)
+                self.artwork.results.pop(target, None)
+                if self._current and self._current['id'] == target:
+                    self._current = None
+                    self._recorded = False
+                    self._resume_position = 0
+                    self._automatic_transition = False
+                    self._repaint_timer.stop()
+                    self._pending_video_frame = QVideoFrame()
+                    self.playback.player.stop()
+                    self.playback.player.setSource(QUrl())
+                    sink = self.playback.player.videoSink()
+                    if sink:
+                        sink.setVideoFrame(QVideoFrame())
+                    self.clearVideo.emit()
+                    self.exitFullscreen()
+                self.refresh_queue()
+                self.refresh()
+                self.message('Removed from library and playlists. File kept; importing its folder can re-add it.')
+            return True
+        except (ValueError, OSError, sqlite3.Error) as error:
+            log.exception('Removal failed')
+            self.message('Could not remove item: ' + str(error))
+            return False
+
+    @Slot(int)
+    def showInExplorer(self, track_id):
+        track = self.repo.track(track_id)
+        if not track or not Path(track['path']).is_file():
+            self.message('The original file is unavailable.')
+            return
+        try:
+            from .shell import reveal_file
+            reveal_file(track['path'])
+            self.message('Shown in File Explorer.')
+        except OSError as error:
+            self.message('Could not show the file: ' + str(error))
 
     @Slot(int, int)
     def moveTrack(self, track_id, direction):
@@ -333,6 +481,9 @@ class Controller(QObject):
 
     @Slot(int)
     def playTrack(self, track_id):
+        if not self.repo.track(track_id):
+            self.message('This media item is no longer in the library.')
+            return
         self._automatic_transition = False
         self._failed.clear()
         self.queue.start([t['id'] for t in self._tracks], track_id)
@@ -389,6 +540,8 @@ class Controller(QObject):
                 self.load_track(self._current['id'])
             else:
                 player.play()
+        elif self.queue.upcoming:
+            self.advance(1, False)
         else:
             self.playView()
 
@@ -553,6 +706,9 @@ class Controller(QObject):
             self.playback.player.setPosition(self._resume_position)
             self._resume_position = 0
         if status == QMediaPlayer.EndOfMedia:
+            # A queued end notification from a removed source must not restart playback.
+            if not self._current or self.playback.player.source().isEmpty():
+                return
             if self._current and self._current.get('has_video') and not self._video_frame_seen:
                 self.on_error(QMediaPlayer.FormatError, 'No video frames were decoded; this video codec may be unsupported by the installed Qt backend')
                 return

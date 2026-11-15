@@ -1,31 +1,49 @@
-﻿# RetroMind Player 0.1.0 Beta
+﻿# RetroMind Player 0.1.1 Beta
 
 Publisher: Wilfred Bancairen. Windows x64 local beta; unsigned.
 
-Includes the existing dark QML interface, local audio/video library, recursive
-import preview, mixed playlists, favourites/history, thumbnails, fullscreen and
-refined transport controls. Python, Qt/QML, Qt Multimedia FFmpeg and PyAV probing
-libraries are bundled; users do not install Python or developer tools.
+## Changes from 0.1.0 Beta
 
-Installation is per user under %LOCALAPPDATA%\Programs\RetroMindPlayer, with a
-Start menu shortcut, optional desktop shortcut and an uninstaller. App data stays
-in %LOCALAPPDATA%\RetroMind\RetroMindPlayer. Upgrades/uninstall do not delete
-library databases, playlists, favourites, history, settings, cache or source media.
-The installer includes no personal media, database or logs. Startup stays silent.
+- User playlists have hover/focus ellipsis buttons, right-click menus and a menu
+  beside the opened heading: Play, Rename and confirmed Delete.
+- Media rows and cards share Play, Add to queue, Add to playlist submenu,
+  favourites, contextual Remove from this playlist, confirmed Remove from library,
+  Show in File Explorer and Details. Keyboard menu key/Shift+F10, Enter and Escape
+  are supported. Actions target the clicked item; opening a menu does not play it.
+- Rename is prefilled, rejects blank/duplicate names, saves immediately and
+  persists. Cancelled delete/removal confirmations leave records unchanged.
+- Playlist entry removal/deletion preserves the library, source files, other
+  playlists and the independent active playback queue.
+- Removing a library item cleans playlist/history/bookmark references in one
+  transaction. Removing the current item stops and clears Now Playing, prunes the
+  queue, and keeps next/previous navigation valid. Source files are never deleted
+  or moved. Re-importing the source folder can restore a removed library entry.
+- Existing playlists contain each track at most once; entries use the existing
+  playlist/track key. Relative order is preserved. No schema migration is needed.
 
-Playback is Qt Multimedia with its bundled FFmpeg backend, not VLC. Software
-rendering/decoding defaults and explicit environment overrides are retained.
-MP4 is a container, not a decoder guarantee. The installed Qt build has a known
-AV1 no-picture limitation, independent of successful PyAV probing/import. Generated
-H.264/AAC MP4/MKV, VP9/Opus WebM, HEVC/AAC MP4 and video-only H.264 were verified
-in the source baseline. Smooth 4K, every codec/profile and all hardware are not
-promised. No transcoding, codec-pack installation or security-setting changes.
+## Installation and data
+
+Python, Qt/QML, Qt Multimedia FFmpeg and PyAV probing/artwork libraries are bundled.
+Users do not install Python, VS Code or development tools. Per-user install goes
+under %LOCALAPPDATA%\Programs\RetroMindPlayer, with Start menu and optional desktop
+shortcuts. User data stays in %LOCALAPPDATA%\RetroMind\RetroMindPlayer. The stable
+AppId is unchanged from 0.1.0. Setup/uninstall do not delete user data or media.
+No personal database, logs or media are bundled. Startup remains silent.
+
+## Playback limitations and verification
+
+Playback remains Qt Multimedia's bundled FFmpeg backend, not VLC. Existing
+software rendering/decoding defaults and environment overrides remain. MP4 is a
+container, not a decoder guarantee. AV1 no-picture is a known limitation of this
+Qt build, separate from successful import/probing. No codec pack or transcoder is
+installed. Smooth 4K and every codec/profile/hardware combination are not promised.
 
 The owner manually confirmed sound, seeking, fullscreen and track switching in
-the source version. Packaged checks use muted generated fixtures; they do not
-establish audible sound or long-form lip sync on a clean PC. See the release
-verification report and clean-machine checklist for precisely executed checks.
+the source baseline. Automated frozen checks use muted generated fixtures and do
+not establish physical speaker sound or long-form synchronization on a clean PC.
+See VERIFICATION.md for actual tests and CLEAN_MACHINE_CHECKLIST.md for pending
+manual checks. Clean-machine testing has not been performed.
 
-This is a local evaluation build, not a public release. Clean-machine verification,
-code signing and redistribution source/licensing requirements remain release
-steps; see THIRD_PARTY_NOTICES.md. No publication or upload was performed.
+No upload/publication. This unsigned installer is for local evaluation. Public or
+third-party redistribution requires compatible application licensing and matching
+copyleft source/source-offer preparation; see THIRD_PARTY_NOTICES.md.

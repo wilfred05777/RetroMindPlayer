@@ -42,8 +42,9 @@ def installed_entry():
 def main():
     parser=argparse.ArgumentParser()
     parser.add_argument('--install',action='store_true',help='Install, same-version upgrade and uninstall this local beta')
+    parser.add_argument('--upgrade-from',type=Path,help='Older setup to install first, then upgrade to this patch')
     args=parser.parse_args()
-    qa=ROOT/'build/release-verification'; qa.mkdir(parents=True,exist_ok=True)
+    qa=ROOT/'build/release-verification-0.1.1'; qa.mkdir(parents=True,exist_ok=True)
     # Do not accidentally uninstall a user's previous installation.
     installed=Path(os.environ['LOCALAPPDATA'])/'Programs/RetroMindPlayer'
     if args.install and (installed_entry() or installed.exists()):
@@ -66,7 +67,7 @@ def main():
         if process.returncode:
             raise RuntimeError(f'Exit {process.returncode}: {command[0]}')
     try:
-        bundle=ROOT/'dist/0.1.0-beta/RetroMindPlayer'
+        bundle=ROOT/'dist/0.1.1-beta/RetroMindPlayer'
         shutil.copytree(bundle,portable/'app')
         subprocess.run([sys.executable,str(ROOT/'packaging/make_test_media.py'),str(qa/'portable')],cwd=ROOT,check=True)
         call([portable/'app/RetroMindPlayer.exe','--package-test',qa/'portable'])
@@ -75,8 +76,9 @@ def main():
         results['portable']=report
         results['checks'].append('Copied onedir runtime passes frozen QML/media/fullscreen/import/artwork diagnostics with developer paths removed')
         if args.install:
-            setup=ROOT/'release/RetroMindPlayer-0.1.0-Beta-win64-Setup.exe'
-            call([setup,'/VERYSILENT','/SUPPRESSMSGBOXES','/NORESTART','/CURRENTUSER','/TASKS=desktopicon',f'/LOG={qa / "install.log"}'])
+            setup=ROOT/'release/RetroMindPlayer-0.1.1-Beta-win64-Setup.exe'
+            initial_setup=args.upgrade_from.resolve() if args.upgrade_from else setup
+            call([initial_setup,'/VERYSILENT','/SUPPRESSMSGBOXES','/NORESTART','/CURRENTUSER','/TASKS=desktopicon',f'/LOG={qa / "install.log"}'])
             entry=installed_entry()
             assert entry and entry['Publisher']=='Wilfred Bancairen',entry
             assert (installed/'RetroMindPlayer.exe').is_file()
@@ -105,9 +107,14 @@ def main():
             assert running.returncode==0, 'App did not shut down cleanly during upgrade'
             assert library_state(test_data)==before_upgrade, 'Library changed during upgrade'
             assert installed_entry()['InstallLocation']==entry['InstallLocation']
-            results['checks'].append('Same-version upgrade uses stable AppId, closes running app cleanly, and preserves library records/settings/history/playlists/favourites')
+            assert installed_entry()['DisplayVersion']=='0.1.1'
+            call([installed/'RetroMindPlayer.exe','--package-test',qa/'installed'])
+            upgraded=json.loads((qa/'installed/package-test-report.json').read_text())
+            assert upgraded['success'] and upgraded['frozen'],upgraded
+            results['upgraded']=upgraded
+            results['checks'].append(('0.1.0 to 0.1.1 upgrade' if args.upgrade_from else 'Same-version upgrade') + ' uses stable AppId, closes running app cleanly, and preserves library records/settings/history/playlists/favourites')
             call([installed/'RetroMindPlayer.exe','--smoke-test','--data-dir',qa/'installed/userdata'])
-            results['checks'].append('Installed app launches after same-version upgrade')
+            results['checks'].append('Installed 0.1.1 app launches after upgrade')
             before_uninstall=snapshot(test_data)
             call([installed/'unins000.exe','/VERYSILENT','/SUPPRESSMSGBOXES','/NORESTART',f'/LOG={qa / "uninstall.log"}'])
             for _ in range(100):

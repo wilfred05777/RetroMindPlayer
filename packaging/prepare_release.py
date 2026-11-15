@@ -131,7 +131,7 @@ def main():
                 pyav_ffmpeg=av._core.library_meta, qt_version=__import__('PySide6').__version__,
                 playback='Qt Multimedia / bundled FFmpeg; PyAV is metadata and artwork only')
     (GENERATED/'build-info.json').write_text(json.dumps(info,indent=2),encoding='utf-8')
-    version_text = '''VSVersionInfo(ffi=FixedFileInfo(filevers=(0,1,0,0), prodvers=(0,1,0,0), mask=0x3f, flags=0x2, OS=0x40004, fileType=0x1, subtype=0x0, date=(0,0)), kids=[StringFileInfo([StringTable('040904B0', [StringStruct('CompanyName','Wilfred Bancairen'), StringStruct('FileDescription','RetroMind Player 0.1.0 Beta'), StringStruct('FileVersion','0.1.0.0'), StringStruct('InternalName','RetroMindPlayer'), StringStruct('OriginalFilename','RetroMindPlayer.exe'), StringStruct('ProductName','RetroMind Player'), StringStruct('ProductVersion','0.1.0 Beta')])]), VarFileInfo([VarStruct('Translation',[1033,1200])])])'''
+    version_text = '''VSVersionInfo(ffi=FixedFileInfo(filevers=(0,1,1,0), prodvers=(0,1,1,0), mask=0x3f, flags=0x2, OS=0x40004, fileType=0x1, subtype=0x0, date=(0,0)), kids=[StringFileInfo([StringTable('040904B0', [StringStruct('CompanyName','Wilfred Bancairen'), StringStruct('FileDescription','RetroMind Player 0.1.1 Beta'), StringStruct('FileVersion','0.1.1.0'), StringStruct('InternalName','RetroMindPlayer'), StringStruct('OriginalFilename','RetroMindPlayer.exe'), StringStruct('ProductName','RetroMind Player'), StringStruct('ProductVersion','0.1.1 Beta')])]), VarFileInfo([VarStruct('Translation',[1033,1200])])])'''
     (GENERATED/'version-info.txt').write_text(version_text,encoding='utf-8')
     print(f'Prepared original icon, version resources, and {len(urls)} upstream license/attribution files.')
 

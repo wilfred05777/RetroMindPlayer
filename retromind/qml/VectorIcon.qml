@@ -10,6 +10,12 @@ Item {
     property bool filled: ["play", "pause", "previous", "next", "stop"].indexOf(name) >= 0
     property string outline: {
         switch (name) {
+        case "more": return "M5 11 A1 1 0 1 1 5 13 A1 1 0 1 1 5 11 M12 11 A1 1 0 1 1 12 13 A1 1 0 1 1 12 11 M19 11 A1 1 0 1 1 19 13 A1 1 0 1 1 19 11"
+        case "edit": return "M4 16 L15 5 L19 9 L8 20 H4 Z M13 7 L17 11"
+        case "trash": return "M3 6 H21 M9 6 V3 H15 V6 M6 6 L7 21 H17 L18 6 M10 10 V17 M14 10 V17"
+        case "remove": return "M5 12 H19"
+        case "folder": return "M3 6 H10 L12 8 H21 V20 H3 Z"
+        case "info": return "M12 3 A9 9 0 1 1 12 21 A9 9 0 1 1 12 3 M12 11 V17 M12 7 V8"
         case "play": return "M8 5 L19 12 L8 19 Z"
         case "pause": return "M6 5 H10 V19 H6 Z M14 5 H18 V19 H14 Z"
         case "previous": return "M5 5 H7 V19 H5 Z M19 5 L9 12 L19 19 Z"

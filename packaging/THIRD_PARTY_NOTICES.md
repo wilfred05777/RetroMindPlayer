@@ -1,4 +1,4 @@
-﻿# Third-party notices - RetroMind Player 0.1.0 Beta
+﻿# Third-party notices - RetroMind Player 0.1.1 Beta
 
 Publisher: Wilfred Bancairen. This local beta uses the components below. Original
 copyrights and license texts are provided in the adjacent `licenses` directory.

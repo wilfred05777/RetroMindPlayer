@@ -2,9 +2,9 @@
 
 A standalone Windows local music and video player, built with Python, PySide6/QML, Qt Multimedia, SQLite, Mutagen, and PyAV. The dark desktop layout keeps RetroMind branding and uses original colour surfaces and system font symbols; no Spotify integration, account, downloaded brand artwork, recommendations, or advertisements are included.
 
-## Windows installer - 0.1.0 Beta
+## Windows installer - 0.1.1 Beta
 
-Local unsigned x64 setup: `release/RetroMindPlayer-0.1.0-Beta-win64-Setup.exe`.
+Local unsigned x64 setup: `release/RetroMindPlayer-0.1.1-Beta-win64-Setup.exe`.
 Run it normally; no Python/developer tools are needed for the installed app.
 It installs per user, creates a Start menu shortcut and offers a desktop shortcut.
 Uninstall/upgrade preserves the separate AppData library and original media.
@@ -41,6 +41,29 @@ Use another installed Python 3.12+ version to create `.venv` if needed. `pyproje
 - Click a row to select it; double-click or press Enter on a focused row to play. A row's play and heart buttons operate directly. Grid cards play on click and have a separate Select button.
 - Create a playlist with **+** in the sidebar. Select a media item and a destination dropdown, then **Add selected**. Open a playlist to rename it, remove selected items, or move them up/down. Audio and video can share a playlist. Title/order sorting preserves manual playlist order; other sorts temporarily display that order differently. Reordering restores manual order.
 - Imports run off the GUI thread. Discovery, metadata, and insertion progress are shown. Cancel finishes the current probe/file first. **Details** reports skipped files and playback errors; tracebacks and paths are written to the log. Duplicate prevention uses canonical, case-normalized paths plus a SQLite uniqueness constraint.
+
+## Playlist and media menus (0.1.1 Beta)
+
+Hover or keyboard-focus a sidebar playlist for its vector ellipsis button, or
+right-click it. The same Play / Rename / Delete menu is beside an opened playlist's
+heading. Rename is prefilled and persists; blank or duplicate names are rejected.
+Delete names the playlist and requires confirmation. Built-in views cannot be deleted.
+
+Media rows, grid cards and Home media cards offer the same ellipsis/right-click
+menu: Play, Add to queue, Add to playlist submenu, favourites, contextual Remove
+from this playlist, Remove from library, Show in File Explorer and Details. Queue
+and file actions are hidden where unavailable; an empty playlist cannot be played.
+Shift+F10 or the menu key opens the focused item's menu. Arrow keys navigate;
+Enter activates, Escape dismisses. Opening a menu never starts playback. Space
+on a focused menu button belongs to that button rather than global playback.
+
+Playlist-entry removal and playlist deletion leave the library, source files,
+favourites, other playlists and the active queue intact. Each playlist currently
+allows a track once, using its existing playlist/track membership key. Library
+removal requires confirmation, deletes related memberships/history/bookmarks in
+one transaction, and prunes the queue. If it is the current item, playback stops
+and Now Playing clears; next/previous remain valid. No operation deletes or moves
+source files. Re-importing their folder can re-add removed library records.
 
 ## Playback and video
 

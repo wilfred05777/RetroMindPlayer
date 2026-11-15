@@ -108,9 +108,41 @@ class Repository:
             raise ValueError('Enter a playlist name.')
         with self.connect() as db:
             try:
-                db.execute('UPDATE playlists SET name=? WHERE id=?', (name, playlist_id))
+                cursor = db.execute('UPDATE playlists SET name=? WHERE id=?', (name, playlist_id))
+                if cursor.rowcount != 1 or playlist_id <= 0:
+                    raise ValueError('Choose an existing user playlist.')
             except sqlite3.IntegrityError as error:
                 raise ValueError('A playlist with that name already exists.') from error
+
+    def playlist(self, playlist_id):
+        with self.connect() as db:
+            row = db.execute('SELECT p.*, (SELECT COUNT(*) FROM playlist_tracks pt WHERE pt.playlist_id=p.id) item_count FROM playlists p WHERE p.id=? AND p.id>0', (playlist_id,)).fetchone()
+            return dict(row) if row else None
+
+    def delete_playlist(self, playlist_id):
+        with self.connect() as db:
+            db.execute('BEGIN IMMEDIATE')
+            if playlist_id <= 0 or not db.execute('SELECT 1 FROM playlists WHERE id=?', (playlist_id,)).fetchone():
+                raise ValueError('Built-in views cannot be deleted. Choose an existing user playlist.')
+            db.execute('DELETE FROM playlist_tracks WHERE playlist_id=?', (playlist_id,))
+            db.execute('DELETE FROM playlists WHERE id=?', (playlist_id,))
+            selected = db.execute("SELECT value FROM settings WHERE key='playlist'").fetchone()
+            if selected and selected[0] == str(playlist_id):
+                db.execute("UPDATE settings SET value='0' WHERE key='playlist'")
+                db.execute("INSERT INTO settings(key,value) VALUES('view','all') ON CONFLICT(key) DO UPDATE SET value='all'")
+
+    def remove_track(self, track_id):
+        # Explicit cleanup also works on migrated legacy tables without cascade FKs.
+        with self.connect() as db:
+            db.execute('BEGIN IMMEDIATE')
+            if not db.execute('SELECT 1 FROM tracks WHERE id=?', (track_id,)).fetchone():
+                raise ValueError('This media item is no longer in the library.')
+            db.execute('DELETE FROM playlist_tracks WHERE track_id=?', (track_id,))
+            db.execute('DELETE FROM history WHERE track_id=?', (track_id,))
+            bookmark = db.execute("SELECT value FROM settings WHERE key='last_track'").fetchone()
+            if bookmark and bookmark[0] == str(track_id):
+                db.execute("DELETE FROM settings WHERE key IN ('last_track','last_position')")
+            db.execute('DELETE FROM tracks WHERE id=?', (track_id,))
 
     def track(self, track_id):
         with self.connect() as db:

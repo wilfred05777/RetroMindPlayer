@@ -1,4 +1,4 @@
-﻿# Clean-machine checklist - 0.1.0 Beta x64
+﻿# Clean-machine checklist - 0.1.1 Beta x64
 
 Use a fresh Windows 10 (build 19041+) / Windows 11 x64 VM or PC, standard account,
 with no Python, Qt, VS Code, FFmpeg, developer tools or project folders installed.

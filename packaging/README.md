@@ -1,4 +1,4 @@
-﻿# Local Windows x64 build - 0.1.0 Beta
+﻿# Local Windows x64 build - 0.1.1 Beta
 
 The source baseline uses PySide6/QML and Qt Multimedia's FFmpeg plugin for playback,
 with a separate PyAV FFmpeg build for probing/artwork. The spec preserves both ABIs
@@ -23,9 +23,9 @@ application, audits the allowlisted bundle, builds setup, and writes a checksum.
 explicitly installs the pinned build requirements. No publishing step exists.
 
 Outputs:
-- dist/0.1.0-beta/RetroMindPlayer/RetroMindPlayer.exe (keep the whole folder together)
-- release/RetroMindPlayer-0.1.0-Beta-win64-Setup.exe
-- release/RetroMindPlayer-0.1.0-Beta-win64-Setup.exe.sha256
+- dist/0.1.1-beta/RetroMindPlayer/RetroMindPlayer.exe (keep the whole folder together)
+- release/RetroMindPlayer-0.1.1-Beta-win64-Setup.exe
+- release/RetroMindPlayer-0.1.1-Beta-win64-Setup.exe.sha256
 - release/bundle-manifest.json and release notes/checklist/notices
 
 Setup metadata: publisher Wilfred Bancairen, stable AppId
@@ -75,3 +75,16 @@ one it did not create. It creates and removes only this beta's test installation
 generated test data/reports remain in build/release-verification for inspection.
 It uses a private per-process environment namespace for IPC to avoid interfering
 with another app instance. Windows execution policy was not changed for this build.
+
+
+For the 0.1.1 patch, keep the original 0.1.0 setup and verify the actual upgrade:
+
+```powershell
+.\.venv\Scripts\python.exe .\packaging\verify_release.py --install --upgrade-from .\release\RetroMindPlayer-0.1.0-Beta-win64-Setup.exe
+```
+
+The patch's detailed reports are in build/release-verification-0.1.1. Full build
+tests allocate a unique workspace-local temporary directory. See VERIFICATION.md
+for the final results and an initial non-reproduced shared-TEMP database anomaly.
+The final onedir build can refresh external QML data before ISCC compilation;
+the same complete assets are collected by the normal specification on every build.

@@ -3,7 +3,7 @@ import json
 from pathlib import Path
 import sys
 import time
-from PySide6.QtCore import QUrl
+from PySide6.QtCore import QUrl, QObject, QMetaObject
 from PySide6.QtGui import QWindow
 from PySide6.QtMultimedia import QAudioBufferOutput
 
@@ -90,6 +90,36 @@ def run(app, engine, controller, directory, qml_warnings):
         controller.repo.favourite(video['id'])
         controller.repo.save_setting('packaging-sentinel', '0.1.0-beta-preserve')
         check('Persistent playlist/settings', controller.repo.setting('packaging-sentinel') == '0.1.0-beta-preserve' and len(controller.repo.tracks(playlist_id=playlist)) == count)
+        management = controller.repo.create_playlist('Management QA')
+        controller.addToPlaylist(video['id'], management)
+        check('Playlist rename persists', controller.renamePlaylistById(management, 'Management QA renamed') and controller.repo.playlist(management)['name'] == 'Management QA renamed')
+        controller.selectPlaylist(management)
+        menu = root.findChild(QObject, 'mediaContextMenu')
+        menu.setProperty('mediaId', video['id']); menu.setProperty('playlistId', management)
+        check('Media menu opens', QMetaObject.invokeMethod(menu, 'open'))
+        wait(lambda: menu.property('opened'))
+        check('Media menu targets explicit item', menu.property('mediaId') == video['id'])
+        root.grabWindow().save(str(directory/'packaged-menu.png'))
+        QMetaObject.invokeMethod(menu, 'close')
+        before_source = controller.playback.player.source()
+        before_queue = controller.queue.items.copy()
+        controller.removeFromPlaylistAt(video['id'], management)
+        check('Playlist entry removal retains library/queue', controller.repo.track(video['id']) is not None and controller.queue.items == before_queue)
+        controller.requestDeletePlaylist(management); controller.cancelRemoval()
+        check('Cancelled confirmation retains playlist', controller.repo.playlist(management) is not None and not controller.confirmRemoval())
+        controller.requestDeletePlaylist(management)
+        check('Confirmed playlist deletion', controller.confirmRemoval() and controller.repo.playlist(management) is None and controller.view == 'all')
+        check('Playlist deletion preserves playback source/queue', controller.playback.player.source() == before_source and controller.queue.items == before_queue)
+        controller.requestDeletePlaylist(0)
+        check('Built-in view deletion refused', not controller.pendingRemoval)
+        removable = next((row for row in controller.repo.tracks() if Path(row['path']).name == 'metadata-unavailable.mp4'), None)
+        if removable:
+            source = Path(removable['path']); original = source.read_bytes()
+            controller.requestRemoveLibrary(removable['id']); controller.cancelRemoval()
+            check('Cancelled library removal retains record', controller.repo.track(removable['id']) is not None)
+            controller.requestRemoveLibrary(removable['id'])
+            check('Library removal prunes references/queue', controller.confirmRemoval() and controller.repo.track(removable['id']) is None and removable['id'] not in controller.queue.items)
+            check('Library removal retains original file', source.read_bytes() == original)
         root.grabWindow().save(str(directory/'packaged-ui.png'))
         check('No QML runtime warnings', not qml_warnings)
         report['qml_warnings'] = qml_warnings

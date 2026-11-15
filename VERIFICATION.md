@@ -147,3 +147,14 @@ same-version upgrade, relaunch and uninstall passed, retaining library/media.
 No clean-machine verification was performed. Detailed results and limits are in
 [packaging/VERIFICATION.md](packaging/VERIFICATION.md). Owner-confirmed audible
 source playback is distinct from muted packaged automated checks.
+
+
+# 0.1.1 Beta management menus - 2026-11-15
+
+Final regression: 43 passed, 1 known AV1 expected failure. Management UI checks
+passed at 100% and 200%; an earlier 150% subset passed. The final frozen build,
+actual 0.1.0-to-0.1.1 per-user upgrade, launch and uninstall passed with data/media
+preserved. Installer AppId is unchanged; the setup/checksum are in release/.
+The initial shared-TEMP database anomaly, repeat results and remaining manual
+limits are documented in [packaging/VERIFICATION.md](packaging/VERIFICATION.md).
+No clean-machine verification or upload was performed; installer remains unsigned.

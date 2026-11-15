@@ -1,109 +1,139 @@
-# RetroMind Player 0.1.0 Beta - local packaging verification
+# RetroMind Player 0.1.1 Beta - management menus and patch verification
 
-Date: 2026-11-15 (Asia/Manila). Publisher: Wilfred Bancairen.
-Target: Windows x64. Tested host: Windows 11 build 26200 x64.
-Setup and application PE machine: AMD64 / 0x8664. Both are unsigned.
+Date: 2026-11-15, Asia/Manila. Publisher: Wilfred Bancairen.
+Setup/application are Windows x64 and unsigned. Local build only; no publication.
 
-## Deliverable
+## Delivered
 
-- Setup: release/RetroMindPlayer-0.1.0-Beta-win64-Setup.exe
-- Size: 71,560,449 bytes
-- SHA-256: `0068fffd50d23e437f63439f43d039001200885f9137b5e1675b166b4322d07f` (recomputed and matched the .sha256 file)
-- Bundle: 2084 files, 267,086,305 bytes,
-  PyInstaller onedir with replaceable _internal runtime files.
-- Stable AppId: {5C759A24-7B4C-4EE4-AB17-1E46217E6227}.
-- Normal install: %LOCALAPPDATA%\Programs\RetroMindPlayer.
-- Normal user data: %LOCALAPPDATA%\RetroMind\RetroMindPlayer (unchanged identity).
+- Setup: release/RetroMindPlayer-0.1.1-Beta-win64-Setup.exe
+- Setup size: 71,583,014 bytes.
+- SHA-256: `fb5ba998754d744edf0063373da27a22885826a51c673c92f91583d55cef73aa`; recomputed and matched the adjacent checksum file.
+- Onedir: dist/0.1.1-beta/RetroMindPlayer/RetroMindPlayer.exe.
+- Stable AppId retained: {5C759A24-7B4C-4EE4-AB17-1E46217E6227}.
+- Existing 0.1.0 setup/checksum retained for the real upgrade test.
+- Bundle audited: 2088 files; no personal database, media,
+  logs, tests, virtual environment or secrets included by the data allowlist.
 
-## Build and source checks
+## Implementation
 
-- Python 3.14.7 x64, PyInstaller 6.22.3, hooks-contrib 2026.10,
-  PySide6 6.12.0, Mutagen 1.48.1, PyAV 18.1.0, Inno Setup 7.1.1 x64.
-- Source tests after packaging/IPC changes: **31 passed, 1 xfailed in 16.73s**.
-- Separate graceful installer-shutdown regression: **1 passed in 1.57s**.
-- Python compilation and pip dependency check passed; git diff check passed.
-- Inno compiler download and compiler Authenticode signatures were valid,
-  signed by Pyrsys B.V. This does not sign the produced RetroMind installer.
-- PowerShell execution policy blocked running .ps1 files; it was not changed.
-  The supplied PowerShell wrapper was not executed. The same Python build driver
-  was executed successfully, and invokes the actual PyInstaller and ISCC tools.
+User playlists have sidebar hover/focus ellipsis and right-click menus, plus a
+heading menu. Play targets the named playlist independently of the current view;
+empty playlists cannot play. Rename is prefilled, rejects blank/duplicate names,
+saves immediately and persists. Delete confirms the name and explains that media
+and library records remain. Built-in views have no delete menu and are rejected
+by repository/controller guards. Deleting the viewed playlist opens All media.
 
-## Automated frozen-runtime verification
+Rows, grid cards and Home cards share explicit-target menus: Play, queue,
+playlist submenu, favourites, contextual membership removal, confirmed library
+removal, File Explorer and Details. Missing-file/queue-only contexts hide unavailable
+actions without blank slots. Menus stay within window bounds, have keyboard focus,
+and support arrows, Enter, Escape, menu key and Shift+F10. Opening by right click,
+ellipsis or focused-button keyboard activation does not start playback. Global
+Space yields to focused controls and menus. Stale selected-row controls clear.
 
-Copied the entire onedir build into a temporary directory outside the source tree.
-Launched it there with PYTHONPATH/PYTHONHOME/virtual-environment/Qt developer plugin
-paths removed and PATH restricted to Windows system directories. Its own JSON
-report confirms `frozen: true` and the external executable path.
+Playlist membership is already unique per playlist/track pair; repeated entries
+are not supported, so no membership-ID migration is needed. Membership removal
+keeps remaining relative order, library/favourites, other playlists and playback.
+Playlist deletion and library removal use transactions, explicit reference cleanup,
+and rollback on errors. Library removal cleans memberships/history/bookmarks and
+never deletes or moves source files. Re-import may re-add the source.
 
-Both the external copy and installed executable passed:
+The in-memory queue stays independent of playlist storage. Deleting a library item
+prunes all queue references; deleting the current item stops/clears Now Playing,
+video frames and fullscreen. A cursor gap keeps next/previous navigation correct,
+and stale end-of-media notifications cannot restart a removed source. Existing
+playback engine, import logic and schema version 2 remain unchanged.
 
-- QML load without runtime warnings; application icon decoding; silent startup.
-- Background recursive discovery, import preview/confirmation, duplicate import.
-- MP4 metadata-failure fallback retained the file with a warning.
-- Background thumbnail generation/cache and visible artwork/fallbacks.
-- WAV decoded audio, H.264/AAC MP4 decoded picture/audio, VP9/Opus WebM picture/audio.
-- Pause, seek and volume bindings on the one Qt media player/audio output.
-- Video fullscreen enter/exit without source/position reset, audio/video/audio
-  transition and clearing of stale video frames.
-- Playlist, favourite, history and setting persistence in isolated test data.
+## Actual automated source checks
 
-The existing source playback backend is unchanged: Qt Multimedia FFmpeg 9.0.1 for
-playback, with separate PyAV FFmpeg libraries for metadata/artwork. No VLC or
-external ffmpeg executable is required. Original packaging generated fixtures,
-logs and temporary databases are not part of the release bundle.
+- Final full suite: **43 passed, 1 xfailed in 22.76 seconds**.
+- Dedicated management suite after final selection update: **12 passed**.
+- Final 200% Qt scale-factor management suite: **12 passed in 7.59 seconds**.
+- Earlier 150% management suite: **10 passed in 6.53 seconds**, before the two
+  additional video-removal/missing-context cases were added.
+- Playback missing/corrupt automatic-advance case repeated in five fresh isolated
+  processes/directories: **five passed**.
+- Compilation, dependency check and diff whitespace checks passed. Git reports
+  a line-ending normalization notice for release notes, not a whitespace failure.
 
-## Automated installation lifecycle
+Tests exercise rename/delete persistence, blank/duplicate rejection, protected
+views, SQL rollback after reference cleanup, reference integrity, original-file
+hash preservation and re-import. They verify removal from one playlist keeps other
+playlists/favourites/order, queue continuity, current audio/video removal including
+fullscreen/frame clearing, stale end events, and valid navigation after pruning.
+Native QML tests send real pointer/keyboard events for clicked-target row/card
+menus, submenu selection, favourites, queueing, Details, ellipsis buttons,
+confirmation cancellation/acceptance and empty/missing contexts. No QML runtime
+warnings were observed in successful interaction tests. Scaled tests scroll cached
+virtualized delegates into view and click their visible portion; cached items may
+otherwise be clipped in a small viewport. Scaling uses QT_SCALE_FACTOR, not a
+change to Windows display settings.
 
-- Silent per-user install completed with no administrative install mode or reboot.
-  Installer log confirms 64-bit Setup and HKCU registration.
-- Version/publisher metadata, Start menu shortcut and opt-in desktop shortcut passed.
-- Installed executable passed the same frozen media/QML tests.
-- Same-version upgrade with the installed app open completed successfully. Stable
-  AppId reused the installation; app-specific per-user IPC closed the player
-  gracefully and allowed saving state/draining workers. No force-kill configured.
-- Library tracks, playlist membership/order, favourites, history and non-layout
-  settings matched across the upgrade. Window geometry is allowed to save on close.
-- Installed app launched after upgrade.
-- Uninstall removed application binary, shortcuts and uninstall entry. Test data
-  and media outside installation were preserved byte-for-byte.
-- Existing actual RetroMind user data matched its before/after hashes during the
-  final lifecycle run. The first diagnostic attempt generated only Qt QML cache
-  files in the default cache location; later runs redirect that cache too. The
-  existing library database and original media were never imported into the build.
-- The test installation was uninstalled after verification. Run setup to install
-  for normal use; generated QA data remains under build/release-verification.
+## Frozen application and actual 0.1.0 to 0.1.1 upgrade
 
-An earlier upgrade attempt exposed Restart Manager being blocked by an elevated
-McAfee service that also had a file open. This was resolved through graceful
-app-specific IPC before file replacement, without modifying security software or
-settings. The final repeated lifecycle test passed. QML/plugin and multimedia
-checks exposed no new packaging dependency/playback failures.
+Executed packaging/verify_release.py --install --upgrade-from the retained 0.1.0
+setup against the final rebuilt installer. Its JSON report confirms success:
 
-## Visual/manual evidence and limits
+- External temporary copy of the frozen onedir app launches with developer paths
+  removed. QML/icon/artwork/import/duplicates, WAV decoded audio, H.264/AAC MP4 and
+  VP9/Opus WebM decoded picture/audio, seek/volume and fullscreen checks pass.
+- Frozen management menus open without warnings; explicit media target, persisted
+  rename, membership removal, cancelled/confirmed removals, built-in protection,
+  queue pruning and original-file retention checks pass.
+- Per-user 0.1.0 installation, publisher metadata, Start menu and optional desktop
+  shortcut succeed. Generated media/test database are outside installation.
+- Upgrade to 0.1.1 with the 0.1.0 app open closes it gracefully, reuses the same
+  AppId/path, reports DisplayVersion 0.1.1 and preserves tracks, memberships/order,
+  favourites, history and non-layout settings. Normal window layout may save on
+  close; application identity and data directory are unchanged.
+- The upgraded frozen 0.1.1 app passes the media/management diagnostic and relaunch.
+- Uninstall removes app/shortcuts/uninstall entry and keeps test data/media.
+- Existing actual RetroMind user data matches before/after hashes. The test
+  installation was removed after verification; normal use requires running setup.
+- Installed-menu screenshots were visually inspected. The frozen diagnostic opens
+  menus programmatically; source QML tests cover actual right-click/ellipsis events.
 
-The installed UI screenshot was visually inspected: real generated media rows,
-video thumbnails, fallback artwork, vector controls and layout rendered correctly.
-No interactive installer-wizard navigation or native file-picker clicks were
-performed during packaging verification; installation was automated/silent and
-preview used the same application/controller flow.
+The final onedir Python archive was produced by PyInstaller after passing the full
+suite. Its final external QML selection-state asset was then refreshed from the
+verified source, the bundle re-audited, and Inno Setup recompiled. Source/bundled
+Main.qml bytes and final setup checksum were explicitly compared. The normal full
+build script collects the same complete QML assets on a new build.
 
-The owner manually confirmed audible sound, seeking, fullscreen and switching
-tracks in the Git-saved source baseline. Packaged automated playback was muted;
-physical speaker output, subjective long-form sync and smooth 4K were not verified.
-The known AV1 no-picture limitation remains the one expected test failure; successful
-MP4 import is not a claim that every codec/profile decodes. HEVC/MKV were checked
-in the source suite, not separately in this packaged diagnostic.
+Local detailed reports/logs: build/release-verification-0.1.1/verification.json and
+portable/installed package-test-report.json, plus install/upgrade/uninstall logs.
 
-**No clean-machine/VM test was performed.** No Windows 10 or Arm64 test was performed.
-The bundled interpreter and dependencies are present and developer paths were
-removed for the frozen checks, but the host still has development software.
-Use CLEAN_MACHINE_CHECKLIST.md on a fresh standard-user Windows PC.
+## Manual/API checks, limitations and anomalous run
 
-No build was published/uploaded. This is an unsigned local evaluation beta.
-THIRD_PARTY_NOTICES.md and 79 upstream licence/attribution files are included.
-Public/third-party redistribution still requires a compatible RetroMind application
-licence and complete matching copyleft source/source-offer preparation; the local
-packaging work does not select an application licence or complete that release step.
+The File Explorer shell API returned success for a generated path containing an
+apostrophe and Unicode; the file bytes were unchanged. Its visual selection was
+not manually inspected. The installed dark menu screenshot was visually reviewed.
+The owner previously confirmed sound/seeking/fullscreen/track switching in the
+source baseline. Packaged checks were muted; audible packaged speaker output,
+long-form synchronization, live monitor/DPI transitions and smooth 4K remain
+manual checks. No clean-machine/VM test, Windows 10 or Arm64 test was performed.
+The known AV1 no-picture limitation remains the one expected test failure.
 
-Detailed local reports and installer logs: build/release-verification/.
-Build recipe and checked official references: packaging/README.md.
+One initial full run encountered `database disk image is malformed` in the shared
+Windows TEMP database for the existing automatic-advance test. Inspection of a
+copy confirmed that temporary database was malformed. No causal fix is claimed;
+the cause was not established. It did not recur in subsequent complete suites
+using unique workspace-local temporary directories, five isolated repetitions,
+or frozen/install/upgrade checks. The failing temporary copy is under
+build/qa-temporary-db-investigation; no actual user library was involved. This
+anomaly remains recorded rather than being treated as proof of a resolved cause.
+
+The installer is unsigned and nothing was uploaded. Public/third-party distribution
+still requires the licensing/corresponding-source preparation described in
+THIRD_PARTY_NOTICES.md. The prior 0.1.0 report is retained as VERIFICATION-0.1.0.md.
+
+## Launch from the project directory
+
+```powershell
+.\.venv\Scripts\python.exe -m retromind.main
+```
+
+Or launch the bundled app without Python:
+
+```powershell
+.\dist\0.1.1-beta\RetroMindPlayer\RetroMindPlayer.exe
+```

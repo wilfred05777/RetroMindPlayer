@@ -19,9 +19,96 @@ ApplicationWindow {
     property int selectedTrack: -1
     property bool queueTab: false
     property bool editingPlaylist: false
+    property int editingPlaylistId: 0
     property bool wasMaximized: false
     property real sideWidth: 248
     property real rightWidth: 292
+    function openPlaylistMenu(playlistId, anchor, x, y) {
+        if (!controller.playlistInfo(playlistId).id) return
+        playlistMenu.playlistId = playlistId
+        playlistMenu.popup(anchor, x, y)
+    }
+    function openMediaMenu(mediaId, playlistId, anchor, x, y) {
+        if (!controller.mediaInfo(mediaId).id) return
+        window.selectedTrack = mediaId
+        mediaMenu.mediaId = mediaId
+        mediaMenu.playlistId = playlistId
+        mediaMenu.popup(anchor, x, y)
+    }
+    function editPlaylist(playlistId) {
+        const playlist = controller.playlistInfo(playlistId)
+        if (!playlist.id) return
+        window.editingPlaylist = true
+        window.editingPlaylistId = playlistId
+        playlistName.text = playlist.name
+        playlistError.text = ""
+        playlistDialog.open()
+    }
+    function savePlaylistName() {
+        const saved = window.editingPlaylist ? controller.renamePlaylistById(window.editingPlaylistId, playlistName.text) : controller.createPlaylist(playlistName.text)
+        if (saved) { playlistDialog.close(); playlistName.clear() }
+        else playlistError.text = controller.status
+    }
+    PlaylistMenu {
+        id: playlistMenu; objectName: "playlistContextMenu"
+        backend: controller; menuWidthLimit: window.width; menuHeightLimit: window.height
+        onRenameRequested: function(playlistId) { window.editPlaylist(playlistId) }
+    }
+    MediaMenu {
+        id: mediaMenu; objectName: "mediaContextMenu"
+        backend: controller; menuWidthLimit: window.width; menuHeightLimit: window.height
+        onDetailsRequested: function(mediaId) { mediaDetailsDialog.media = controller.mediaInfo(mediaId); mediaDetailsDialog.open() }
+    }
+    Dialog {
+        id: confirmationDialog; objectName: "removalConfirmation"
+        property var removal: ({})
+        title: removal.kind === "playlist" ? "Delete playlist?" : "Remove from library?"
+        anchors.centerIn: parent; modal: true; width: Math.min(window.width - 40, 520)
+        closePolicy: Popup.CloseOnEscape
+        contentItem: Label {
+            objectName: "removalExplanation"; textFormat: Text.PlainText; wrapMode: Text.WordWrap
+            text: confirmationDialog.removal.kind === "playlist" ?
+                'Delete "' + (confirmationDialog.removal.title || "") + '"? Only the playlist and its entries will be deleted. Media files and library items will remain.' :
+                'Remove "' + (confirmationDialog.removal.title || "") + '" from the library and all playlists? The original file will remain on disk. Importing its source folder again can re-add it.'
+        }
+        footer: DialogButtonBox {
+            Button { id: cancelRemovalButton; text: "Cancel"; DialogButtonBox.buttonRole: DialogButtonBox.RejectRole; Keys.onReturnPressed: confirmationDialog.reject() }
+            Button { objectName: "confirmRemovalButton"; text: confirmationDialog.removal.kind === "playlist" ? "Delete playlist" : "Remove from library"; DialogButtonBox.buttonRole: DialogButtonBox.AcceptRole; Keys.onReturnPressed: confirmationDialog.accept() }
+            onAccepted: confirmationDialog.accept()
+            onRejected: confirmationDialog.reject()
+        }
+        onOpened: cancelRemovalButton.forceActiveFocus()
+        onAccepted: controller.confirmRemoval()
+        onRejected: controller.cancelRemoval()
+    }
+    Dialog {
+        id: mediaDetailsDialog; objectName: "mediaDetailsDialog"
+        property var media: ({})
+        anchors.centerIn: parent; modal: true; title: "Media details"
+        width: Math.min(window.width - 40, 640); height: Math.min(window.height - 40, 450)
+        standardButtons: Dialog.Close
+        ScrollView {
+            anchors.fill: parent
+            TextArea {
+                readOnly: true; selectByMouse: true; wrapMode: TextEdit.Wrap; textFormat: TextEdit.PlainText
+                text: (mediaDetailsDialog.media.title || "") + "\nArtist: " + (mediaDetailsDialog.media.artist || "Unknown") +
+                    "\nAlbum: " + (mediaDetailsDialog.media.album || "Unknown") + "\nType: " + (mediaDetailsDialog.media.media_type || "Unknown") +
+                    "\nDuration: " + window.clock(mediaDetailsDialog.media.duration * 1000) + "\nContainer: " + (mediaDetailsDialog.media.container || "Unknown") +
+                    "\nVideo codec: " + (mediaDetailsDialog.media.video_codec || "Unknown / no video") + "\nAudio codec: " + (mediaDetailsDialog.media.audio_codec || "Unknown / no audio") +
+                    "\nDimensions: " + (mediaDetailsDialog.media.width ? mediaDetailsDialog.media.width + " x " + mediaDetailsDialog.media.height : "Unknown") +
+                    "\nAdded: " + (mediaDetailsDialog.media.date_added || "Unknown") + "\nFile: " + (mediaDetailsDialog.media.path || "") +
+                    "\nAvailable: " + (mediaDetailsDialog.media.available ? "Yes" : "No") + "\nCodec information does not guarantee playback support."
+            }
+        }
+    }
+    function focusOwnsPlaybackKey() {
+        let item = window.activeFocusItem
+        while (item) {
+            if (item.playbackKeyOwner === true || item.checkable !== undefined) return true
+            item = item.parent
+        }
+        return false
+    }
     function clock(ms) {
         if (!ms || ms < 0) return "--:--"
         const sec = Math.floor(ms / 1000)
@@ -29,15 +116,27 @@ ApplicationWindow {
     }
     onClosing: { controller.saveWindow(width, height); controller.savePanelWidths(sideWidth, rightWidth) }
     Component.onCompleted: { sideWidth = controller.sidebarWidth; rightWidth = controller.rightWidth }
-    Shortcut { sequence: "Space"; enabled: !searchField.activeFocus && !playlistName.activeFocus; onActivated: controller.togglePlay() }
-    Shortcut { sequence: "Escape"; onActivated: controller.exitFullscreen() }
+    Shortcut { objectName: "playbackSpaceShortcut"; sequence: "Space"; enabled: !searchField.activeFocus && !playlistName.activeFocus && !window.focusOwnsPlaybackKey() && !playlistMenu.opened && !mediaMenu.opened && !confirmationDialog.opened && !playlistDialog.opened && !mediaDetailsDialog.opened; onActivated: controller.togglePlay() }
+    Shortcut { sequence: "Escape"; enabled: !playlistMenu.opened && !mediaMenu.opened && !confirmationDialog.opened && !playlistDialog.opened && !mediaDetailsDialog.opened; onActivated: controller.exitFullscreen() }
     Shortcut { sequence: "Ctrl+O"; onActivated: filesDialog.open() }
     Shortcut { sequence: "Ctrl+F"; onActivated: searchField.forceActiveFocus() }
     Connections {
         target: controller
+        function onChanged() {
+            if (window.selectedTrack <= 0) return
+            const visibleItems = controller.tracks
+            for (let index = 0; index < visibleItems.length; ++index) {
+                if (visibleItems[index].id === window.selectedTrack) return
+            }
+            window.selectedTrack = -1
+        }
         function onLayoutChanged() {
             if (controller.fullscreen && window.visibility !== Window.FullScreen) { window.wasMaximized = window.visibility === Window.Maximized; window.showFullScreen() }
             else if (!controller.fullscreen && window.visibility === Window.FullScreen) { if (window.wasMaximized) window.showMaximized(); else window.showNormal() }
+        }
+        function onConfirmationChanged() {
+            if (controller.pendingRemoval.kind) { confirmationDialog.removal = controller.pendingRemoval; confirmationDialog.open() }
+            else if (confirmationDialog.opened) confirmationDialog.close()
         }
         function onClearVideo() { videoOutput.clearOutput() }
     }
@@ -58,12 +157,19 @@ ApplicationWindow {
         onAccepted: controller.importFiles(selectedFiles)
     }
     Dialog {
-        id: playlistDialog; anchors.centerIn: parent; modal: true; width: 360
+        id: playlistDialog; objectName: "playlistNameDialog"; anchors.centerIn: parent; modal: true; width: Math.min(window.width - 40, 420)
         title: window.editingPlaylist ? "Rename playlist" : "Create playlist"
-        standardButtons: Dialog.Ok | Dialog.Cancel
-        TextField { id: playlistName; width: parent.width; placeholderText: "Playlist name"; maximumLength: 160; onAccepted: playlistDialog.accept() }
-        onOpened: playlistName.forceActiveFocus()
-        onAccepted: { if (window.editingPlaylist) controller.renamePlaylist(playlistName.text); else controller.createPlaylist(playlistName.text); playlistName.clear() }
+        contentItem: ColumnLayout {
+            TextField { id: playlistName; objectName: "playlistNameInput"; Layout.fillWidth: true; placeholderText: "Playlist name"; maximumLength: 160; onAccepted: { if (text.trim()) window.savePlaylistName() } }
+            Label { id: playlistError; textFormat: Text.PlainText; visible: text !== ""; color: "#FF8585"; wrapMode: Text.WordWrap; Layout.fillWidth: true }
+        }
+        footer: DialogButtonBox {
+            standardButtons: Dialog.Ok | Dialog.Cancel
+            onAccepted: window.savePlaylistName()
+            onRejected: playlistDialog.reject()
+            Component.onCompleted: standardButton(Dialog.Ok).enabled = Qt.binding(function() { return playlistName.text.trim().length > 0 })
+        }
+        onOpened: { playlistError.text = ""; playlistName.forceActiveFocus(); playlistName.selectAll() }
     }
     Dialog {
         id: detailsDialog; anchors.centerIn: parent; modal: true; title: "Diagnostics"
@@ -141,7 +247,13 @@ ApplicationWindow {
                             width: ListView.view.width; height: modelData.id === 0 ? 0 : 52; visible: modelData.id !== 0
                             text: librarySidebar.expanded ? modelData.name : "\u2261"
                             Accessible.name: modelData.name; ToolTip.visible: hovered; ToolTip.text: modelData.name
-                            contentItem: Text { text: parent.text; color: controller.selectedPlaylist === savedPlaylist.modelData.id ? "#1DB954" : "#FFFFFF"; elide: Text.ElideRight; verticalAlignment: Text.AlignVCenter }
+                            objectName: "sidebarPlaylist_" + modelData.id
+                            contentItem: RowLayout {
+                                Text { text: savedPlaylist.text; visible: librarySidebar.expanded || !playlistMore.visible; color: controller.selectedPlaylist === savedPlaylist.modelData.id ? "#1DB954" : "#FFFFFF"; elide: Text.ElideRight; verticalAlignment: Text.AlignVCenter; Layout.fillWidth: true }
+                                IconButton { id: playlistMore; objectName: "playlistMore_" + savedPlaylist.modelData.id; iconName: "more"; tip: "Playlist options: " + savedPlaylist.modelData.name; visible: savedPlaylist.hovered || savedPlaylist.activeFocus || activeFocus; Layout.preferredWidth: 30; onClicked: window.openPlaylistMenu(savedPlaylist.modelData.id, playlistMore, 0, height); Keys.onReturnPressed: clicked() }
+                            }
+                            MouseArea { anchors.fill: parent; acceptedButtons: Qt.RightButton; onClicked: function(mouse) { savedPlaylist.forceActiveFocus(); window.openPlaylistMenu(savedPlaylist.modelData.id, savedPlaylist, mouse.x, mouse.y) } }
+                            Keys.onPressed: function(event) { if (event.key === Qt.Key_Menu || (event.key === Qt.Key_F10 && (event.modifiers & Qt.ShiftModifier))) { window.openPlaylistMenu(savedPlaylist.modelData.id, savedPlaylist, 0, height); event.accepted = true } }
                             background: Rectangle { color: parent.hovered || controller.selectedPlaylist === savedPlaylist.modelData.id ? "#282828" : "transparent"; radius: 5; border.color: parent.activeFocus ? "#FFFFFF" : "transparent" }
                             onClicked: { window.selectedTrack = -1; controller.selectPlaylist(modelData.id) }
                         }
@@ -345,7 +457,7 @@ ApplicationWindow {
                         }
                         ListView {
                             Layout.fillWidth: true; Layout.preferredHeight: 230; orientation: ListView.Horizontal; spacing: 14; clip: true; model: parent.items
-                            delegate: MediaCard { required property var modelData; media: modelData }
+                            delegate: MediaCard { required property var modelData; media: modelData; onContextMenuRequested: function(anchor, x, y) { window.openMediaMenu(modelData.id, 0, anchor, x, y) } }
                             ScrollBar.horizontal: ScrollBar {}
                         }
                     }
@@ -379,7 +491,7 @@ ApplicationWindow {
                     Label { text: controller.viewTitle; color: "#FFFFFF"; font.pixelSize: mainPanel.width < 600 || mainPanel.height < 560 ? 26 : 36; font.bold: true; Layout.fillWidth: true; elide: Text.ElideRight }
                     Label { text: controller.tracks.length + " items / " + (controller.totalDuration ? window.clock(controller.totalDuration * 1000) + " known duration" : "Duration unknown"); color: "#B3B3B3"; font.pixelSize: 12 }
                 }
-                Button { text: "Rename"; visible: controller.selectedPlaylist > 0; onClicked: { window.editingPlaylist = true; playlistName.text = controller.viewTitle; playlistDialog.open() } }
+                IconButton { objectName: "playlistHeadingMenu"; iconName: "more"; tip: "Playlist options"; visible: controller.selectedPlaylist > 0; onClicked: window.openPlaylistMenu(controller.selectedPlaylist, this, 0, height); Keys.onReturnPressed: clicked() }
             }
             RowLayout {
                 Button { text: "\u25b6 Play"; enabled: controller.tracks.length > 0; onClicked: controller.playView() }
@@ -408,14 +520,18 @@ ApplicationWindow {
         ListView {
             id: mediaList; objectName: "libraryList"; clip: true; spacing: 3; model: controller.tracks
             delegate: Rectangle {
+                id: mediaRow
                 required property var modelData
                 required property int index
+                objectName: "mediaRow_" + modelData.id
                 width: mediaList.width; height: 66; radius: 5
                 color: window.selectedTrack === modelData.id ? "#303030" : rowHover.hovered ? "#242424" : "transparent"
                 border.color: activeFocus ? "#FFFFFF" : "transparent"; activeFocusOnTab: true
                 Keys.onReturnPressed: controller.playTrack(modelData.id)
                 HoverHandler { id: rowHover }
-                TapHandler { onTapped: { window.selectedTrack = modelData.id; parent.forceActiveFocus() } onDoubleTapped: controller.playTrack(modelData.id) }
+                MouseArea { anchors.fill: parent; acceptedButtons: Qt.RightButton; onClicked: function(mouse) { mediaRow.forceActiveFocus(); window.openMediaMenu(mediaRow.modelData.id, controller.selectedPlaylist, mediaRow, mouse.x, mouse.y) } }
+                Keys.onPressed: function(event) { if (event.key === Qt.Key_Menu || (event.key === Qt.Key_F10 && (event.modifiers & Qt.ShiftModifier))) { window.openMediaMenu(mediaRow.modelData.id, controller.selectedPlaylist, mediaRow, 0, height); event.accepted = true } }
+                TapHandler { acceptedButtons: Qt.LeftButton; onTapped: { window.selectedTrack = modelData.id; parent.forceActiveFocus() } onDoubleTapped: controller.playTrack(modelData.id) }
                 RowLayout {
                     anchors.fill: parent; anchors.margins: 7; spacing: 10
                     Label { text: controller.currentTrack.id === modelData.id ? "\u25b6" : String(index + 1); color: controller.currentTrack.id === modelData.id ? "#1DB954" : "#777777"; Layout.preferredWidth: 20 }
@@ -428,7 +544,8 @@ ApplicationWindow {
                     Label { text: modelData.media_type === "video" ? "VIDEO" : "AUDIO"; color: "#B3B3B3"; font.pixelSize: 10 }
                     IconButton { text: modelData.favourite ? "\u2665" : "\u2661"; tip: "Toggle favourite"; active: !!modelData.favourite; onClicked: controller.toggleFavourite(modelData.id) }
                     Label { text: window.clock(modelData.duration * 1000); color: "#B3B3B3"; Layout.preferredWidth: 42; horizontalAlignment: Text.AlignRight; font.pixelSize: 12 }
-                    IconButton { text: "\u25b6"; tip: "Play " + modelData.title; onClicked: controller.playTrack(modelData.id) }
+                    IconButton { iconName: "play"; tip: "Play " + modelData.title; onClicked: controller.playTrack(modelData.id) }
+                    IconButton { objectName: "mediaMore_" + modelData.id; iconName: "more"; tip: "Media options: " + modelData.title; onClicked: window.openMediaMenu(modelData.id, controller.selectedPlaylist, this, 0, height); Keys.onReturnPressed: clicked() }
                 }
             }
             Label { anchors.centerIn: parent; width: parent.width - 30; visible: mediaList.count === 0; text: "No media here yet.\nImport local files or adjust your search and filters."; wrapMode: Text.WordWrap; horizontalAlignment: Text.AlignHCenter; color: "#B3B3B3"; lineHeight: 1.5 }
@@ -443,7 +560,7 @@ ApplicationWindow {
             delegate: ColumnLayout {
                 required property var modelData
                 width: mediaGrid.cellWidth - 12; height: mediaGrid.cellHeight - 12; spacing: 0
-                MediaCard { media: modelData; Layout.fillWidth: true; Layout.fillHeight: true }
+                MediaCard { media: modelData; Layout.fillWidth: true; Layout.fillHeight: true; onContextMenuRequested: function(anchor, x, y) { window.openMediaMenu(modelData.id, controller.selectedPlaylist, anchor, x, y) } }
                 Button { text: window.selectedTrack === modelData.id ? "Selected" : "Select"; Layout.fillWidth: true; flat: true; onClicked: window.selectedTrack = modelData.id }
             }
             Label { anchors.centerIn: parent; width: parent.width - 30; visible: mediaGrid.count === 0; text: "No matching media. Import files or adjust your filters."; wrapMode: Text.WordWrap; horizontalAlignment: Text.AlignHCenter; color: "#B3B3B3" }

@@ -1,8 +1,8 @@
 #define AppName "RetroMind Player"
-#define AppVersion "0.1.0"
-#define AppDisplayVersion "0.1.0 Beta"
+#define AppVersion "0.1.1"
+#define AppDisplayVersion "0.1.1 Beta"
 #ifndef BundleDir
-  #define BundleDir "..\dist\0.1.0-beta\RetroMindPlayer"
+  #define BundleDir "..\dist\0.1.1-beta\RetroMindPlayer"
 #endif
 #ifndef ReleaseDir
   #define ReleaseDir "..\release"
@@ -13,10 +13,10 @@ AppName={#AppName}
 AppVersion={#AppVersion}
 AppVerName={#AppName} {#AppDisplayVersion}
 AppPublisher=Wilfred Bancairen
-VersionInfoVersion=0.1.0.0
+VersionInfoVersion=0.1.1.0
 VersionInfoTextVersion={#AppDisplayVersion}
 VersionInfoProductName={#AppName}
-VersionInfoProductVersion=0.1.0.0
+VersionInfoProductVersion=0.1.1.0
 VersionInfoProductTextVersion={#AppDisplayVersion}
 DefaultDirName={localappdata}\Programs\RetroMindPlayer
 DefaultGroupName={#AppName}
@@ -37,7 +37,7 @@ UninstallDisplayIcon={app}\RetroMindPlayer.exe
 SetupIconFile=..\retromind\assets\retromind.ico
 InfoBeforeFile=RELEASE_NOTES.md
 OutputDir={#ReleaseDir}
-OutputBaseFilename=RetroMindPlayer-0.1.0-Beta-win64-Setup
+OutputBaseFilename=RetroMindPlayer-0.1.1-Beta-win64-Setup
 Compression=lzma2
 SolidCompression=yes
 WizardStyle=modern

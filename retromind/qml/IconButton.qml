@@ -2,6 +2,7 @@
 import QtQuick.Controls
 Button {
     id: control
+    property bool playbackKeyOwner: true
     property string tip: text
     property string iconName: ""
     property bool prominent: false

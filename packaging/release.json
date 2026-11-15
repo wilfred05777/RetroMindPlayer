@@ -1,7 +1,7 @@
 {
-  "version": "0.1.0",
-  "display_version": "0.1.0 Beta",
-  "python_version": "0.1.0b0",
+  "version": "0.1.1",
+  "display_version": "0.1.1 Beta",
+  "python_version": "0.1.1b0",
   "publisher": "Wilfred Bancairen",
   "app_id": "{5C759A24-7B4C-4EE4-AB17-1E46217E6227}"
 }
